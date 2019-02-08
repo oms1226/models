@@ -44,7 +44,9 @@ cd "${WORK_DIR}"
 download_and_uncompress() {
   local BASE_URL=${1}
   local FILENAME=${2}
-
+  if [ -f "../${FILENAME}" ]; then
+    cp -f ../${FILENAME} ./
+  fi
   if [ ! -f "${FILENAME}" ]; then
     echo "Downloading ${FILENAME} to ${WORK_DIR}"
     wget -nd -c "${BASE_URL}/${FILENAME}"
