@@ -22,6 +22,31 @@
 #   sh ./local_test_mobilenetv2.sh
 #
 #
+_ALL=false
+_CLEAN=false
+# Train 10 iterations.
+NUM_ITERATIONS=10
+
+while [ $1 ]
+do
+    if [ "$1" == "all" ]
+    then
+    _ALL=true
+    elif [ "$1" == "clean" ]
+    then
+    _CLEAN=true
+    elif [ "$1" == "-num" ]
+    then
+    shift
+    NUM_ITERATIONS=$1
+    fi
+    shift
+done
+
+echo "_CLEAN: ${_CLEAN}"
+echo "_ALL: ${_ALL}"
+echo "NUM_ITERATIONS: ${NUM_ITERATIONS}"
+START_TIME=$(date +%Y%m%d%H%M%S)
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
@@ -35,20 +60,25 @@ export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
 # Set up the working environment.
 CURRENT_DIR=$(pwd)
 WORK_DIR="${CURRENT_DIR}/deeplab"
+DATASET_DIR="datasets"
+PASCAL_FOLDER="pascal_voc_seg"
+if [ ${_CLEAN} = true ] ; then
+rm -rf ${WORK_DIR}/${DATASET_DIR}/${PASCAL_FOLDER}
+fi
 
+if [ ${_ALL} = true ] ; then
 # Run model_test first to make sure the PYTHONPATH is correctly set.
 python "${WORK_DIR}"/model_test.py -v
 
 # Go to datasets folder and download PASCAL VOC 2012 segmentation dataset.
-DATASET_DIR="datasets"
 cd "${WORK_DIR}/${DATASET_DIR}"
 sh download_and_convert_voc2012.sh
+fi
 
 # Go back to original directory.
 cd "${CURRENT_DIR}"
 
 # Set up the working directories.
-PASCAL_FOLDER="pascal_voc_seg"
 EXP_FOLDER="exp/train_on_trainval_set_mobilenetv2"
 INIT_FOLDER="${WORK_DIR}/${DATASET_DIR}/${PASCAL_FOLDER}/init_models"
 TRAIN_LOGDIR="${WORK_DIR}/${DATASET_DIR}/${PASCAL_FOLDER}/${EXP_FOLDER}/train"
@@ -66,14 +96,15 @@ TF_INIT_ROOT="http://download.tensorflow.org/models"
 CKPT_NAME="deeplabv3_mnv2_pascal_train_aug"
 TF_INIT_CKPT="${CKPT_NAME}_2018_01_29.tar.gz"
 cd "${INIT_FOLDER}"
+if [ ${_ALL} = true ] ; then
 wget -nd -c "${TF_INIT_ROOT}/${TF_INIT_CKPT}"
 tar -xf "${TF_INIT_CKPT}"
+fi
 cd "${CURRENT_DIR}"
 
 PASCAL_DATASET="${WORK_DIR}/${DATASET_DIR}/${PASCAL_FOLDER}/tfrecord"
 
-# Train 10 iterations.
-NUM_ITERATIONS=10
+if [ ${_ALL} = true ] ; then
 python "${WORK_DIR}"/train.py \
   --logtostderr \
   --train_split="trainval" \
@@ -113,6 +144,7 @@ python "${WORK_DIR}"/vis.py \
   --vis_logdir="${VIS_LOGDIR}" \
   --dataset_dir="${PASCAL_DATASET}" \
   --max_number_of_iterations=1
+fi
 
 # Export the trained checkpoint.
 CKPT_PATH="${TRAIN_LOGDIR}/model.ckpt-${NUM_ITERATIONS}"
@@ -130,3 +162,6 @@ python "${WORK_DIR}"/export_model.py \
 
 # Run inference with the exported checkpoint.
 # Please refer to the provided deeplab_demo.ipynb for an example.
+END___TIME=$(date +%Y%m%d%H%M%S)
+echo "START_TIME: ${START_TIME}"
+echo "END___TIME: ${END___TIME}"
