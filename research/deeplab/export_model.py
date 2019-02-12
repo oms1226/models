@@ -27,6 +27,8 @@ flags = tf.app.flags
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_bool('tflite', True, 'https://github.com/tensorflow/tensorflow/issues/23747')
+
 flags.DEFINE_string('checkpoint_path', None, 'Checkpoint path')
 
 flags.DEFINE_string('export_path', None,
@@ -128,10 +130,12 @@ def main(unused_argv):
 
     predictions = tf.cast(predictions[common.OUTPUT_TYPE], tf.float32)
     # Crop the valid regions from the predictions.
-    semantic_predictions = tf.slice(
-        predictions,
-        [0, 0, 0],
-        [1, resized_image_size[0], resized_image_size[1]])
+    # enable tflite for exporting tflite model
+    if not FLAGS.tflite:
+        semantic_predictions = tf.slice(
+            predictions,
+            [0, 0, 0],
+            [1, resized_image_size[0], resized_image_size[1]])
     # Resize back the prediction to the original image size.
     def _resize_label(label, label_size):
       # Expand dimension of label to [1, height, width, 1] for resize operation.
@@ -142,7 +146,11 @@ def main(unused_argv):
           method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
           align_corners=True)
       return tf.cast(tf.squeeze(resized_label, 3), tf.int32)
-    semantic_predictions = _resize_label(semantic_predictions, image_size)
+    if FLAGS.tflite:
+        # semantic_predictions = tf.cast(predictions[common.OUTPUT_TYPE], tf.int32)
+        semantic_predictions = tf.squeeze(predictions)
+    else:
+        semantic_predictions = _resize_label(semantic_predictions, image_size)
     semantic_predictions = tf.identity(semantic_predictions, name=_OUTPUT_NAME)
 
     saver = tf.train.Saver(tf.model_variables())
