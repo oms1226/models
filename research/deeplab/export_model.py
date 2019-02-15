@@ -27,7 +27,7 @@ flags = tf.app.flags
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_bool('tflite', True, 'https://github.com/tensorflow/tensorflow/issues/23747')
+flags.DEFINE_bool('tflite', True, 'Add flipped images during inference or not. https://github.com/tensorflow/tensorflow/issues/23747')
 
 flags.DEFINE_string('checkpoint_path', None, 'Checkpoint path')
 
@@ -76,7 +76,9 @@ def _create_input_tensors():
     resized_image_size: Resized image shape tensor [height, width].
   """
   # input_preprocess takes 4-D image tensor as input.
+  # input_image = tf.placeholder(tf.uint8, [1, 513, 513, 3], name=_INPUT_NAME)
   input_image = tf.placeholder(tf.uint8, [1, None, None, 3], name=_INPUT_NAME)
+  #input_image = tf.placeholder(tf.float32, [1, None, None, 3], name=_INPUT_NAME)
   original_image_size = tf.shape(input_image)[1:3]
 
   # Squeeze the dimension in axis=0 since `preprocess_image_and_label` assumes
@@ -128,12 +130,12 @@ def main(unused_argv):
           eval_scales=FLAGS.inference_scales,
           add_flipped_images=FLAGS.add_flipped_images)
 
-    predictions = tf.cast(predictions[common.OUTPUT_TYPE], tf.float32)
+    # predictions = tf.cast(predictions[common.OUTPUT_TYPE], tf.float32)
     # Crop the valid regions from the predictions.
     # enable tflite for exporting tflite model
     if not FLAGS.tflite:
         semantic_predictions = tf.slice(
-            predictions,
+            tf.cast(predictions[common.OUTPUT_TYPE], tf.uint8),
             [0, 0, 0],
             [1, resized_image_size[0], resized_image_size[1]])
     # Resize back the prediction to the original image size.
@@ -147,8 +149,8 @@ def main(unused_argv):
           align_corners=True)
       return tf.cast(tf.squeeze(resized_label, 3), tf.int32)
     if FLAGS.tflite:
-        # semantic_predictions = tf.cast(predictions[common.OUTPUT_TYPE], tf.int32)
-        semantic_predictions = tf.squeeze(predictions)
+        semantic_predictions = tf.cast(predictions[common.OUTPUT_TYPE], tf.uint8)
+        semantic_predictions = tf.squeeze(semantic_predictions)
     else:
         semantic_predictions = _resize_label(semantic_predictions, image_size)
     semantic_predictions = tf.identity(semantic_predictions, name=_OUTPUT_NAME)
